@@ -113,8 +113,12 @@ def smoothness_indicator(u,discr):
 
     #No special meaning to these values
     #Should be exposed as tuning parameters
+    # for third order?
+    #kappa=0.5
+    #so = -7.0
+    # for first order?
     kappa=0.5
-    so = -7.0
+    so = -1.0
 
     #Compute artificail viscosity percentage based on idicator and set parameters
     yesnol = indicator > (so-kappa)

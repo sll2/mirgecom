@@ -31,10 +31,39 @@ import loopy as lp
 import numpy as np
 from dataclasses import dataclass
 import pytools
+from logpyle import LogManager
+from mirgecom.logging_quantities import KernelProfile
+from statistics import mean
 
 __doc__ = """
 .. autoclass:: PyOpenCLProfilingArrayContext
 """
+
+
+# {{{ Support for non-Loopy results (e.g., pyopencl kernels)
+
+nonloopy_profile_events = []
+
+
+def init_pyopencl_array_monkey_patch():
+    """Add the :mod:`pyopencl` monkey patching."""
+    cl.array.ARRAY_KERNEL_EXEC_HOOK = array_kernel_exec_hook
+
+
+def del_pyopencl_array_monkey_patch():
+    """Remove the :mod:`pyopencl` monkey patching."""
+    cl.array.ARRAY_KERNEL_EXEC_HOOK = None
+
+
+@dataclass(eq=True, frozen=True)
+class NonLoopyProfilekernel:
+    """Class to hold the name for a non-loopy profile result.
+
+    This is necessary so that :meth:`tabulate_profiling_data` can
+    access the 'name' field of the non-Loopy kernel.
+    """
+
+    name: str
 
 
 @dataclass
@@ -45,6 +74,20 @@ class ProfileResult:
     flops: int
     bytes_accessed: int
     footprint_bytes: int
+
+
+# For pyopencl.Array's elementwise kernels.
+elwise_knl = NonLoopyProfilekernel("pyopencl_array")
+
+
+def array_kernel_exec_hook(knl, queue, gs, ls, *actual_args, wait_for):
+    """Initialize the :mod:`pyopencl` monkey patching."""
+    evt = knl(queue, gs, ls, *actual_args, wait_for=wait_for)
+    nonloopy_profile_events.append(evt)
+
+    return evt
+
+# }}}
 
 
 @dataclass
@@ -61,11 +104,12 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
 
     .. automethod:: tabulate_profiling_data
     .. automethod:: call_loopy
+    .. automethod:: get_profiling_data_for_kernel
 
     Inherits from :class:`meshmode.array_context.PyOpenCLArrayContext`.
     """
 
-    def __init__(self, queue, allocator=None) -> None:
+    def __init__(self, queue, allocator=None, logmgr: LogManager = None) -> None:
         super().__init__(queue, allocator)
 
         if not queue.properties & cl.command_queue_properties.PROFILING_ENABLE:
@@ -76,11 +120,24 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
         self.profile_events = []
         self.profile_results = {}
         self.kernel_stats = {}
+        self.logmgr = logmgr
+
+    def __del__(self):
+        """Release resources and undo monkey patching."""
+        del self.profile_events[:]
+        self.profile_results.clear()
+        self.kernel_stats.clear()
+
+        del_pyopencl_array_monkey_patch()
 
     def _finish_profile_events(self) -> None:
         # First, wait for completion of all events
         if self.profile_events:
             cl.wait_for_events([pevt.cl_event for pevt in self.profile_events])
+
+        global nonloopy_profile_events
+        if nonloopy_profile_events:
+            cl.wait_for_events(nonloopy_profile_events)
 
         # Then, collect all events and store them
         for t in self.profile_events:
@@ -92,16 +149,65 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
 
             self.profile_results.setdefault(program, []).append(new)
 
-        self.profile_events = []
+        for t in nonloopy_profile_events:
+            program = elwise_knl
+            time = t.profile.end - t.profile.start
+            new = ProfileResult(time, None, None, None)
+            self.profile_results.setdefault(program, []).append(new)
 
-    def tabulate_profiling_data(self) -> pytools.Table:
+        self.profile_events = []
+        nonloopy_profile_events = []
+
+    def get_profiling_data_for_kernel(self, kernel_name: str,
+                                      wait_for_events=True) -> float:
+        """Return value of profiling result for kernel `kernel_name`."""
+        if wait_for_events:
+            self._finish_profile_events()
+
+        def _gather_data(results_list: list):
+            results = [key for key in results_list if key.name == kernel_name]
+            num_calls = 0
+            times = []
+            flops = []
+            bytes_accessed = []
+            fprint_bytes = []
+
+            for key in results:
+                value = results_list[key]
+
+                num_calls += len(value)
+
+                times += [v.time / 1e9 for v in value]
+                flops += [v.flops / 1e9 if v.flops is not None else 0
+                         for v in value]
+
+                bytes_accessed += [v.bytes_accessed / 1e9
+                              if v.bytes_accessed is not None else 0 for v in value]
+                fprint_bytes += [v.footprint_bytes / 1e9 if v.footprint_bytes
+                                 is not None else 0 for v in value]
+
+                del results_list[key]
+
+            return num_calls, times, flops, bytes_accessed, fprint_bytes
+
+        num_calls, times, flops, bytes_accessed, fprint_bytes = \
+            _gather_data(self.profile_results)
+
+        if num_calls == 0:
+            return [0, 0, 0, 0, 0]
+
+        return [mean(times), mean(flops), num_calls, mean(bytes_accessed),
+                mean(fprint_bytes)]
+
+    def tabulate_profiling_data(self, wait_for_events=True) -> pytools.Table:
         """Return a :class:`pytools.Table` with the profiling results."""
-        self._finish_profile_events()
+        if wait_for_events:
+            self._finish_profile_events()
 
         tbl = pytools.Table()
 
         tbl.add_row(["Function", "Calls",
-            "Time_min [s]", "Time_avg [s]", "Time_max [s]",
+            "Time_sum [s]", "Time_min [s]", "Time_avg [s]", "Time_max [s]",
             "GFlops/s_min", "GFlops/s_avg", "GFlops/s_max",
             "BWAcc_min [GByte/s]", "BWAcc_mean [GByte/s]", "BWAcc_max [GByte/s]",
             "BWFoot_min [GByte/s]", "BWFoot_mean [GByte/s]", "BWFoot_max [GByte/s]",
@@ -112,16 +218,28 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
 
         from statistics import mean
 
+        total_calls = 0
+        total_time = 0
+
         for key, value in self.profile_results.items():
             num_values = len(value)
 
+            total_calls += num_values
+
             times = [v.time / 1e9 for v in value]
 
-            flops = [v.flops / 1e9 for v in value]
-            flops_per_sec = [f / t for f, t in zip(flops, times)]
+            total_time += sum(times)
 
-            bytes_accessed = [v.bytes_accessed / 1e9 for v in value]
-            bandwidth_access = [b / t for b, t in zip(bytes_accessed, times)]
+            flops = [v.flops / 1e9 if v.flops is not None and v.flops > 0 else None
+                     for v in value]
+            flops_per_sec = [f / t if f is not None else None
+                              for f, t in zip(flops, times)]
+
+            bytes_accessed = [v.bytes_accessed / 1e9
+                             if v.bytes_accessed is not None else None
+                             for v in value]
+            bandwidth_access = [b / t if b is not None else None
+                                 for b, t in zip(bytes_accessed, times)]
 
             fprint_bytes = np.ma.masked_equal([v.footprint_bytes for v in value],
                 None)
@@ -135,16 +253,38 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
                 fprint_min = "--"
                 fprint_max = "--"
 
-            bytes_per_flop = [f / b for f, b in zip(flops, bytes_accessed)]
+            bytes_per_flop = [f / b if b is not None and f is not None and b > 0
+                              else None for f, b in zip(flops, bytes_accessed)]
+            bytes_per_flop_mean = f"{mean(bytes_per_flop):{g}}" \
+                                    if None not in bytes_per_flop else "--"
 
-            tbl.add_row([key.name, num_values,
+            if None not in flops_per_sec:
+                flops_per_sec_min = f"{min(flops_per_sec):{g}}"
+                flops_per_sec_mean = f"{mean(flops_per_sec):{g}}"
+                flops_per_sec_max = f"{max(flops_per_sec):{g}}"
+            else:
+                flops_per_sec_min = "--"
+                flops_per_sec_mean = "--"
+                flops_per_sec_max = "--"
+
+            if None not in bandwidth_access:
+                bandwidth_access_min = f"{min(bandwidth_access):{g}}"
+                bandwidth_access_mean = f"{mean(bandwidth_access):{g}}"
+                bandwidth_access_max = f"{max(bandwidth_access):{g}}"
+            else:
+                bandwidth_access_min = "--"
+                bandwidth_access_mean = "--"
+                bandwidth_access_max = "--"
+
+            tbl.add_row([key.name, num_values, f"{sum(times):{g}}",
                 f"{min(times):{g}}", f"{mean(times):{g}}", f"{max(times):{g}}",
-                f"{min(flops_per_sec):{g}}", f"{mean(flops_per_sec):{g}}",
-                f"{max(flops_per_sec):{g}}",
-                f"{min(bandwidth_access):{g}}", f"{mean(bandwidth_access):{g}}",
-                f"{max(bandwidth_access):{g}}",
+                flops_per_sec_min, flops_per_sec_mean, flops_per_sec_max,
+                bandwidth_access_min, bandwidth_access_mean, bandwidth_access_max,
                 fprint_min, f"{fprint_mean:{g}}", fprint_max,
-                f"{mean(bytes_per_flop):{g}}"])
+                bytes_per_flop_mean])
+
+        tbl.add_row(["Total", total_calls, f"{total_time:{g}}"] + ["--"] * 13)
+        self.profile_results = {}
 
         return tbl
 
@@ -221,10 +361,20 @@ class PyOpenCLProfilingArrayContext(PyOpenCLArrayContext):
                 footprint_bytes=footprint_bytes)
 
             self.kernel_stats.setdefault(program, {})[args_tuple] = res
+
+            init_pyopencl_array_monkey_patch()
+
+            if self.logmgr:
+                if "pyopencl_array_time" not in self.logmgr.quantity_data:
+                    self.logmgr.add_quantity(KernelProfile(self, "pyopencl_array"))
+
+                if f"{program.name}_time" not in self.logmgr.quantity_data:
+                    self.logmgr.add_quantity(KernelProfile(self, program.name))
+
             return args_tuple
 
     def call_loopy(self, program, **kwargs) -> dict:
-        """Execute the loopy kernel."""
+        """Execute the loopy kernel and profile it."""
         program = self.transform_loopy_program(program)
         assert program.options.return_dict
         assert program.options.no_numpy

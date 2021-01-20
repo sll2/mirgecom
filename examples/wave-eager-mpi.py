@@ -36,9 +36,12 @@ from meshmode.mesh import BTAG_ALL, BTAG_NONE  # noqa
 
 from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
+
 from mirgecom.mpi import mpi_entry_point
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
+from mirgecom.profiling import PyOpenCLProfilingArrayContext
+
 import pyopencl.tools as cl_tools
 
 
@@ -64,14 +67,21 @@ def bump(actx, discr, t=0):
 @mpi_entry_point
 def main():
     """Drive the example."""
+    profiling = True
     cl_ctx = cl.create_some_context()
-    queue = cl.CommandQueue(cl_ctx)
-    actx = PyOpenCLArrayContext(queue,
-        allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+    if profiling:
+        queue = cl.CommandQueue(cl_ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
+        actx = PyOpenCLProfilingArrayContext(queue,
+            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+    else:
+        queue = cl.CommandQueue(cl_ctx)
+        actx = PyOpenCLArrayContext(queue,
+            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
 
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
+    print("%d num procs" % num_parts)
 
     from meshmode.distributed import MPIMeshDistributor, get_partition_by_pymetis
     mesh_dist = MPIMeshDistributor(comm)
@@ -127,15 +137,28 @@ def main():
     t_final = 3
     istep = 0
     while t < t_final:
+        if istep == 10:
+            from pyinstrument import Profiler
+            profiler = Profiler()
+            profiler.start()
+            if profiling:
+                ignore = actx.tabulate_profiling_data()
+
         fields = rk4_step(fields, t, dt, rhs)
 
         if istep % 10 == 0:
             print(istep, t, discr.norm(fields[0]))
-            vis.write_vtk_file("fld-wave-eager-mpi-%03d-%04d.vtu" % (rank, istep),
-                    [
-                        ("u", fields[0]),
-                        ("v", fields[1:]),
-                        ])
+            #vis.write_vtk_file("fld-wave-eager-mpi-%03d-%04d.vtu" % (rank, istep),
+            #        [
+            #            ("u", fields[0]),
+            #            ("v", fields[1:]),
+            #            ])
+
+        if istep == 19:
+            profiler.stop()
+            print(profiler.output_text(unicode=True, color=True, show_all=True))
+            if profiling:
+                print(actx.tabulate_profiling_data())
 
         t += dt
         istep += 1

@@ -79,7 +79,7 @@ def main():
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
 
-    cuda = False
+    cuda = True 
     mpi_comm_info = MPI_Info(comm, cuda)
     CommProf = CommunicationProfile()
 

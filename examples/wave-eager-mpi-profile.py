@@ -39,9 +39,9 @@ from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
 from mirgecom.mpi import CommunicationProfile 
+
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
-from mirgecom.profiling import PyOpenCLProfilingArrayContext
 
 import pyopencl.tools as cl_tools
 import pyopencl as pycl
@@ -69,26 +69,17 @@ def bump(actx, discr, t=0):
 @mpi_entry_point
 def main():
     """Drive the example."""
-    profiling = False 
     cl_ctx = cl.create_some_context()
-    if profiling:
-        queue = cl.CommandQueue(cl_ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
-        actx = PyOpenCLProfilingArrayContext(queue,
-            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
-    else:
-        queue = cl.CommandQueue(cl_ctx)
-        actx = PyOpenCLArrayContext(queue,
-            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+    queue = cl.CommandQueue(cl_ctx)
+    actx = PyOpenCLArrayContext(queue,
+        allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
 
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
-    CommProf = CommunicationProfile(comm)
+    CommProf = CommunicationProfile()
     print("%d num procs" % num_parts)
     print("Device ", pycl.Device.hashable_model_and_version_identifier)
-
-    #def comm_timer():
-    #    return MPI.Wtime()
 
     from meshmode.distributed import MPIMeshDistributor, get_partition_by_pymetis
     mesh_dist = MPIMeshDistributor(comm)
@@ -128,39 +119,30 @@ def main():
     else:
         raise ValueError("don't have a stable time step guesstimate")
 
-    fields = flat_obj_array(
-        bump(actx, discr),
+    fields = flat_obj_array(bump(actx, discr),
         [discr.zeros(actx) for i in range(discr.dim)])
 
     def rhs(t, w):
         return wave_operator(discr, c=1, w=w)
 
-    rank = comm.Get_rank()
-
     t = 0
     t_final = 3
     istep = 0
     while t < t_final:
-        #if istep == 10:
-        #    from pyinstrument import Profiler
-        #    profiler = Profiler()
-        #    profiler.start()
-        #    if profiling:
-        #        ignore = actx.tabulate_profiling_data()
-
         fields = rk4_step(fields, t, dt, rhs)
 
         if istep % 10 == 0:
             print(istep, t, discr.norm(fields[0]))
 
-        #if istep == 19:
-        #    profiler.stop()
-        #    print(profiler.output_text(unicode=True, color=True, show_all=True))
-        #    if profiling:
-        #        print(actx.tabulate_profiling_data())
-
         t += dt
         istep += 1
+
+    # Get final profiling info
+    CommProf.average_profile()
+    totals, msgs, avgs = CommProf.finalize()
+    print(totals)
+    print(msgs)
+    print(avgs)
 
 
 if __name__ == "__main__":

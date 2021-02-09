@@ -82,7 +82,7 @@ def mpi_entry_point(func):
 
     return wrapped_func
 
-class MPIInfo:
+class MPI_Info:
     """
     Holds relevant information for MPI communication including
     - MPI communicator

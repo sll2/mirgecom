@@ -38,6 +38,7 @@ from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
+from mirgecom.mpi import MPI_Info 
 from mirgecom.mpi import CommunicationProfile 
 
 from mirgecom.integrators import rk4_step
@@ -77,7 +78,11 @@ def main():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
+
+    cuda = False
+    mpi_comm_info = MPI_Info(comm, cuda)
     CommProf = CommunicationProfile()
+
     print("%d num procs" % num_parts)
     print("Device ", pycl.Device.hashable_model_and_version_identifier)
 
@@ -108,7 +113,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_communicator=comm, mpi_dtype=MPI.FLOAT, comm_profile=CommProf)
+                    mpi_info=mpi_comm_info, comm_profile=CommProf)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor
@@ -130,9 +135,8 @@ def main():
     istep = 0
     while t < t_final:
         fields = rk4_step(fields, t, dt, rhs)
-
-        if istep % 10 == 0:
-            print(istep, t, discr.norm(fields[0]))
+        #if istep % 10 == 0:
+        #    print(istep, t, discr.norm(fields[0]))
 
         t += dt
         istep += 1
@@ -140,9 +144,15 @@ def main():
     # Get final profiling info
     CommProf.average_profile()
     totals, msgs, avgs = CommProf.finalize()
-    print(totals)
-    print(msgs)
-    print(avgs)
+    rank = Comm.get_rank()
+    for i in range(size):
+        if i == rank:
+            print('Rank ', rank, ' ---------------')
+            print(totals)
+            print(msgs)
+            print(avgs)
+        MPI.Barrier(MPI.COMM_WORLD)
+        
 
 
 if __name__ == "__main__":

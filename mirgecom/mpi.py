@@ -81,3 +81,76 @@ def mpi_entry_point(func):
         func(*args, **kwargs)
 
     return wrapped_func
+
+class CommunicationProfile:
+    """
+    Holds communication profiling information
+    """
+
+    def __init__(self):
+        """
+        init_t : holds the amount of time spent in initializing sends and receives
+        finish_t : holds the amount of time spent in waits and receiving data
+        dev_copy_t : holds the amount of time spent copying data to and from the device for naive communication
+        """
+        self.init_t = 0.0
+        self.finish_t = 0.0
+        self.dev_copy_t = 0.0
+
+        self.init_m = 0
+        self.finish_m = 0
+        self.dev_copy_m = 0
+        
+        self.init_avg = 0.0
+        self.finish_avg = 0.0
+        self.dev_copy_avg = 0.0
+
+    def init_start(self):
+        from mpi4py import MPI
+        self.init_t -= MPI.Wtime()
+        self.init_m += 1
+    
+    def init_stop(self):
+        from mpi4py import MPI
+        self.init_t += MPI.Wtime()
+    
+    def finish_start(self):
+        from mpi4py import MPI
+        self.finish_t -= MPI.Wtime()
+        self.finish_m += 1
+
+    def finish_stop(self):
+        from mpi4py import MPI
+        self.finish_t += MPI.Wtime()
+    
+    def dev_copy_start(self):
+        from mpi4py import MPI
+        self.dev_copy_t -= MPI.Wtime()
+        self.dev_copy_m += 1
+    
+    def dev_copy_stop(self):
+        from mpi4py import MPI
+        self.dev_copy_t += MPI.Wtime()
+
+    def average_profile(self):
+        self.init_avg = self.init_t / self.init_m
+        self.finish_avg = self.finish_t / self.finish_m
+        self.dev_copy_avg = self.dev_copy_t / self.dev_copy_m
+
+    def finalize(self):
+        """
+        Returns the entire comunication profile in 3 separate tuples
+          totals = (total time spent in initializing messages,
+                    total time spent in waiting and receiving messages,
+                    total time spent moving data to and from the device for naive communication)
+        messages = (total number of messages initialized,
+                    total number of messages received,
+                    total number of copies to or from the device)
+        averages = (average time to initialize a message,
+                    average time waiting and receiving messages,
+                    average time copying data to and from device) 
+        """
+        totals = (self.init_t, self.finish_t, self.dev_copy_t)
+        messages = (self.init_m, self.finish_m, self.dev_copy_m)
+        averages = (self.init_avg, self.finish_avg, self.dev_copy_avg)
+        return  totals, messages, averages 

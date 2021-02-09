@@ -43,6 +43,7 @@ from mirgecom.wave import wave_operator
 from mirgecom.profiling import PyOpenCLProfilingArrayContext
 
 import pyopencl.tools as cl_tools
+import pyopencl as pycl
 
 
 def bump(actx, discr, t=0):
@@ -67,7 +68,7 @@ def bump(actx, discr, t=0):
 @mpi_entry_point
 def main():
     """Drive the example."""
-    profiling = True
+    profiling = False 
     cl_ctx = cl.create_some_context()
     if profiling:
         queue = cl.CommandQueue(cl_ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
@@ -82,6 +83,10 @@ def main():
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
     print("%d num procs" % num_parts)
+    print("Device ", pycl.Device.hashable_model_and_version_identifier)
+
+    def comm_timer():
+        return MPI.Wtime()
 
     from meshmode.distributed import MPIMeshDistributor, get_partition_by_pymetis
     mesh_dist = MPIMeshDistributor(comm)
@@ -110,7 +115,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_communicator=comm)
+                    mpi_communicator=comm, mpi_dtype=MPI.FLOAT, profiler=comm_timer)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor
@@ -137,12 +142,12 @@ def main():
     t_final = 3
     istep = 0
     while t < t_final:
-        if istep == 10:
-            from pyinstrument import Profiler
-            profiler = Profiler()
-            profiler.start()
-            if profiling:
-                ignore = actx.tabulate_profiling_data()
+        #if istep == 10:
+        #    from pyinstrument import Profiler
+        #    profiler = Profiler()
+        #    profiler.start()
+        #    if profiling:
+        #        ignore = actx.tabulate_profiling_data()
 
         fields = rk4_step(fields, t, dt, rhs)
 
@@ -154,11 +159,11 @@ def main():
             #            ("v", fields[1:]),
             #            ])
 
-        if istep == 19:
-            profiler.stop()
-            print(profiler.output_text(unicode=True, color=True, show_all=True))
-            if profiling:
-                print(actx.tabulate_profiling_data())
+        #if istep == 19:
+        #    profiler.stop()
+        #    print(profiler.output_text(unicode=True, color=True, show_all=True))
+        #    if profiling:
+        #        print(actx.tabulate_profiling_data())
 
         t += dt
         istep += 1

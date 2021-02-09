@@ -82,6 +82,25 @@ def mpi_entry_point(func):
 
     return wrapped_func
 
+class MPIInfo:
+    """
+    Holds relevant information for MPI communication including
+    - MPI communicator
+    - MPI datatype being sent
+    - Flag for using CudaAware MPI
+    """
+
+    def __init__(self, comm=None, cflag=False):
+        """
+        """
+        from mpi4py import MPI
+        self.comm = comm
+        if comm is None:
+            self.comm = MPI.COMM_WORLD
+        self.d_type = MPI.FLOAT
+        self.cuda_flag = cflag
+    
+
 class CommunicationProfile:
     """
     Holds communication profiling information

@@ -38,6 +38,7 @@ from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
+from mirgecom.mpi import CommunicationProfile 
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
 from mirgecom.profiling import PyOpenCLProfilingArrayContext
@@ -82,6 +83,7 @@ def main():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
+    CommProf = CommunicationProfile(comm)
     print("%d num procs" % num_parts)
     print("Device ", pycl.Device.hashable_model_and_version_identifier)
 
@@ -115,7 +117,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_communicator=comm, mpi_dtype=MPI.FLOAT, profiler=comm_timer)
+                    mpi_communicator=comm, mpi_dtype=MPI.FLOAT, comm_profile=CommProf)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor
@@ -129,7 +131,7 @@ def main():
     fields = flat_obj_array(
         bump(actx, discr),
         [discr.zeros(actx) for i in range(discr.dim)]
-        )
+        
 
     vis = make_visualizer(discr, order+3 if dim == 2 else order)
 

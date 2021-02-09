@@ -144,7 +144,7 @@ def main():
     CommProf.average_profile()
     totals, msgs, avgs = CommProf.finalize()
     rank = comm.Get_rank()
-    for i in range(size):
+    for i in range(num_parts):
         if i == rank:
             print('Rank ', rank, ' ---------------')
             print(totals)

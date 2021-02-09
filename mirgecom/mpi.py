@@ -97,7 +97,7 @@ class MPI_Info:
         self.comm = comm
         if comm is None:
             self.comm = MPI.COMM_WORLD
-        self.d_type = MPI.FLOAT
+        self.d_type = MPI.DOUBLE
         self.cuda_flag = cflag
     
 

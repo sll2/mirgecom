@@ -134,23 +134,23 @@ def main():
     istep = 0
     while t < t_final:
         fields = rk4_step(fields, t, dt, rhs)
-        #if istep % 10 == 0:
-        #    print(istep, t, discr.norm(fields[0]))
+        if istep % 10 == 0:
+            print(istep, t, discr.norm(fields[0]))
 
         t += dt
         istep += 1
 
     # Get final profiling info
-    CommProf.average_profile()
-    totals, msgs, avgs = CommProf.finalize()
-    rank = comm.Get_rank()
-    for i in range(num_parts):
-        if i == rank:
-            print('Rank ', rank, ' ---------------')
-            print(totals)
-            print(msgs)
-            print(avgs)
-        comm.Barrier()
+    #CommProf.average_profile()
+    #totals, msgs, avgs = CommProf.finalize()
+    #rank = comm.Get_rank()
+    #for i in range(num_parts):
+    #    if i == rank:
+    #        print('Rank ', rank, ' ---------------')
+    #        print(totals)
+    #        print(msgs)
+    #        print(avgs)
+    #    comm.Barrier()
         
 
 

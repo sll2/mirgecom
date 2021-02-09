@@ -144,14 +144,14 @@ def main():
     # Get final profiling info
     CommProf.average_profile()
     totals, msgs, avgs = CommProf.finalize()
-    rank = Comm.get_rank()
+    rank = comm.get_rank()
     for i in range(size):
         if i == rank:
             print('Rank ', rank, ' ---------------')
             print(totals)
             print(msgs)
             print(avgs)
-        MPI.Barrier(MPI.COMM_WORLD)
+        MPI.Barrier(comm)
         
 
 

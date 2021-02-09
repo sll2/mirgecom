@@ -150,7 +150,7 @@ def main():
             print(totals)
             print(msgs)
             print(avgs)
-        MPI.Barrier(comm)
+        comm.Barrier()
         
 
 

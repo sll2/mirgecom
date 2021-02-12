@@ -142,26 +142,6 @@ class Communicator(self, comm=None, cflag=False, profile=False):
 
         return self.mpi_communicator.Irecv([buf, self.d_type], sender_rank, tag=Tag)
         
-
-class MPI_Info:
-    """
-    Holds relevant information for MPI communication including
-    - MPI communicator
-    - MPI datatype being sent
-    - Flag for using CudaAware MPI
-    """
-
-    def __init__(self, comm=None, cflag=False):
-        """
-        """
-        from mpi4py import MPI
-        self.comm = comm
-        if comm is None:
-            self.comm = MPI.COMM_WORLD
-        self.d_type = MPI.DOUBLE
-        self.cuda_flag = cflag
-    
-
 class CommunicationProfile:
     """
     Holds communication profiling information

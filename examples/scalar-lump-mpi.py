@@ -1,4 +1,4 @@
-"""Demonstrate Sod's 1D shock example."""
+"""Demonstrate simple scalar lump advection."""
 
 __copyright__ = """
 Copyright (C) 2020 University of Illinois Board of Trustees
@@ -24,9 +24,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 import logging
+import numpy as np
 import pyopencl as cl
 import pyopencl.tools as cl_tools
 from functools import partial
+from pytools.obj_array import make_obj_array
 
 from meshmode.array_context import PyOpenCLArrayContext
 from meshmode.dof_array import thaw
@@ -40,7 +42,7 @@ from mirgecom.simutil import (
     inviscid_sim_timestep,
     sim_checkpoint,
     create_parallel_grid,
-    ExactSolutionMismatch,
+    ExactSolutionMismatch
 )
 from mirgecom.io import make_init_message
 from mirgecom.mpi import mpi_entry_point
@@ -48,7 +50,7 @@ from mirgecom.mpi import mpi_entry_point
 from mirgecom.integrators import rk4_step
 from mirgecom.steppers import advance_state
 from mirgecom.boundary import PrescribedBoundary
-from mirgecom.initializers import SodShock1D
+from mirgecom.initializers import MulticomponentLump
 from mirgecom.eos import IdealSingleGas
 
 
@@ -57,28 +59,23 @@ logger = logging.getLogger(__name__)
 
 @mpi_entry_point
 def main(ctx_factory=cl.create_some_context):
-    """Drive the example."""
+    """Drive example."""
     cl_ctx = ctx_factory()
     queue = cl.CommandQueue(cl_ctx)
     actx = PyOpenCLArrayContext(queue,
-                allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
 
-    dim = 1
-    nel_1d = 24
-    order = 1
-    # tolerate large errors; case is unstable
-    exittol = .2
+    dim = 3
+    nel_1d = 16
+    order = 3
+    exittol = .09
     t_final = 0.01
     current_cfl = 1.0
-    current_dt = .0001
+    current_dt = .001
     current_t = 0
-    eos = IdealSingleGas()
-    initializer = SodShock1D(dim=dim)
-    casename = "sod1d"
-    boundaries = {BTAG_ALL: PrescribedBoundary(initializer)}
     constant_cfl = False
-    nstatus = 10
-    nviz = 10
+    nstatus = 1
+    nviz = 1
     rank = 0
     checkpoint_t = current_t
     current_step = 0
@@ -90,11 +87,26 @@ def main(ctx_factory=cl.create_some_context):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
+    nspecies = 4
+    centers = make_obj_array([np.zeros(shape=(dim,)) for i in range(nspecies)])
+    spec_y0s = np.ones(shape=(nspecies,))
+    spec_amplitudes = np.ones(shape=(nspecies,))
+    eos = IdealSingleGas()
+
+    velocity = np.ones(shape=(dim,))
+
+    initializer = MulticomponentLump(dim=dim, nspecies=nspecies,
+                                     spec_centers=centers, velocity=velocity,
+                                     spec_y0s=spec_y0s,
+                                     spec_amplitudes=spec_amplitudes)
+    boundaries = {BTAG_ALL: PrescribedBoundary(initializer)}
+
+    casename = "mixture-lump"
+
     from meshmode.mesh.generation import generate_regular_rect_mesh
     generate_grid = partial(generate_regular_rect_mesh, a=(box_ll,) * dim,
                             b=(box_ur,) * dim, n=(nel_1d,) * dim)
     local_mesh, global_nelements = create_parallel_grid(comm, generate_grid)
-
     local_nelements = local_mesh.nelements
 
     discr = EagerDGDiscretization(

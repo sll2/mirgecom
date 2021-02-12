@@ -1,18 +1,5 @@
-"""Functions for time integration.
-
-Time integrators
-^^^^^^^^^^^^^^^^
-.. autofunction:: rk4_step
-.. autofunction:: euler_step
-"""
-
 __copyright__ = """
 Copyright (C) 2020 University of Illinois Board of Trustees
-"""
-
-__author__ = """
-Center for Exascale-Enabled Scramjet Design
-University of Illinois, Urbana, IL 61801
 """
 
 __license__ = """
@@ -35,16 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
+import logging
+from mirgecom.mechanisms import get_mechanism_cti
 
-def rk4_step(state, t, dt, rhs):
-    """Take one step using 4th order Runge-Kutta."""
-    k1 = rhs(t, state)
-    k2 = rhs(t+dt/2, state + dt/2*k1)
-    k3 = rhs(t+dt/2, state + dt/2*k2)
-    k4 = rhs(t+dt, state + dt*k3)
-    return state + dt/6*(k1 + 2*k2 + 2*k3 + k4)
+logger = logging.getLogger(__name__)
 
 
-def euler_step(state, t, dt, rhs):
-    """Take one step using forward Euler time integration."""
-    return state + dt*rhs(t, state)
+def test_cti_reader():
+    """Quick test of CTI reader."""
+    test_cti = get_mechanism_cti("uiuc")
+    first_line = test_cti.partition("\n")[0].strip()
+
+    assert first_line == "# CH4_BFER mechanisme: CH4 + 1.5 O2  => CO +2H2O"

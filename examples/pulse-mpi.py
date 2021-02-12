@@ -29,6 +29,7 @@ from mirgecom.mpi import mpi_entry_point
 import numpy as np
 from functools import partial
 import pyopencl as cl
+import pyopencl.tools as cl_tools
 
 from meshmode.array_context import PyOpenCLArrayContext
 from meshmode.dof_array import thaw
@@ -67,7 +68,8 @@ def main(ctx_factory=cl.create_some_context):
     """Drive the example."""
     cl_ctx = ctx_factory()
     queue = cl.CommandQueue(cl_ctx)
-    actx = PyOpenCLArrayContext(queue)
+    actx = PyOpenCLArrayContext(queue,
+                allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
 
     logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ def main(ctx_factory=cl.create_some_context):
     current_dt = .01
     current_t = 0
     eos = IdealSingleGas()
-    initializer = Lump(center=orig, velocity=vel, rhoamp=0.0)
+    initializer = Lump(dim=dim, center=orig, velocity=vel, rhoamp=0.0)
     casename = "pulse"
     boundaries = {BTAG_ALL: PrescribedBoundary(initializer)}
     wall = AdiabaticSlipBoundary()
@@ -121,13 +123,13 @@ def main(ctx_factory=cl.create_some_context):
         actx, local_mesh, order=order, mpi_communicator=comm
     )
     nodes = thaw(actx, discr.nodes())
-    uniform_state = initializer(0, nodes)
-    acoustic_pulse = AcousticPulse(numdim=dim, amplitude=1.0, width=.1,
+    uniform_state = initializer(nodes)
+    acoustic_pulse = AcousticPulse(dim=dim, amplitude=1.0, width=.1,
                                    center=orig)
     current_state = acoustic_pulse(x_vec=nodes, q=uniform_state, eos=eos)
 
-    visualizer = make_visualizer(discr, discr.order + 3
-                                 if discr.dim == 2 else discr.order)
+    visualizer = make_visualizer(discr, order + 3 if dim == 2 else order)
+
     initname = "pulse"
     eosname = eos.__class__.__name__
     init_message = make_init_message(dim=dim, order=order,

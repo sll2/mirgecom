@@ -38,6 +38,7 @@ from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
+from mirgecom.mpi import Communicator 
 from mirgecom.mpi import CommunicationProfile 
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
@@ -84,14 +85,12 @@ def main():
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
     CommProf = CommunicationProfile(comm)
+    Comm = Communicator(comm)
     print("%d num procs" % num_parts)
     print("Device ", pycl.Device.hashable_model_and_version_identifier)
 
-    #def comm_timer():
-    #    return MPI.Wtime()
-
     from meshmode.distributed import MPIMeshDistributor, get_partition_by_pymetis
-    mesh_dist = MPIMeshDistributor(comm)
+    mesh_dist = MPIMeshDistributor(Comm.mpi_communicator)
 
     dim = 2
     nel_1d = 16
@@ -117,7 +116,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_communicator=comm, mpi_dtype=MPI.FLOAT, comm_profile=CommProf)
+                    mpi_communicator=Comm)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor

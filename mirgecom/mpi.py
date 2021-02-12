@@ -117,6 +117,9 @@ class Communicator(self, comm=None, cflag=False, profile=False):
 
     def IRecv(self, actx, gpu_ary, data_ary_size, sender_rank, Tag):
         return self.irecv(actx, gpu_ary, data_ary_size, receiver_rank, Tag)
+    
+    def Wait(self, actx):
+        return
 
     def _isend_cpu(self, actx, data_ary, data_ary_size, receiver_rank, Tag):
         local_data = actx.to_numpy(data_ary)

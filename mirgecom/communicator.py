@@ -5,7 +5,7 @@ from mpi4py import MPI
 # CPU helper functions for sending and receiving
 #
 ################################################
-def _isend_cpu(self, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
+def _isend_cpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
     """
     Returns :
         MPI send request
@@ -30,7 +30,7 @@ def _isend_cpu(self, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler
     
     return Return_Request 
     
-def _irecv_cpu(self, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
+def _irecv_cpu(actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
     """
     Returns mpi recv request
     """
@@ -42,7 +42,7 @@ def _irecv_cpu(self, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
 
     return Return_Request 
 
-def _wait_cpu(self, mpi_req, actx, data_ary, profiler):
+def _wait_cpu(mpi_req, actx, data_ary, profiler):
     """
     Returns the data received in the data_ary position in a form that actx understands
         or
@@ -69,7 +69,7 @@ def _wait_cpu(self, mpi_req, actx, data_ary, profiler):
 # GPU helper functions for sending and receiving
 #
 ################################################
-def _isend_gpu(self, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
+def _isend_gpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
     """
     Returns mpi send request
     """
@@ -87,7 +87,7 @@ def _isend_gpu(self, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler
 
     return Return_Request 
 
-def _irecv_gpu(self, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
+def _irecv_gpu(actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
     """
     Returns mpi recv request
     """
@@ -105,7 +105,7 @@ def _irecv_gpu(self, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
 
     return Return_Request 
 
-def _wait_gpu(self, mpi_req, actx, data_ary, profiler):
+def _wait_gpu(mpi_req, actx, data_ary, profiler):
     """
     Returns the data received in the data_ary position in a form that actx understands
         or

@@ -154,6 +154,18 @@ class CommunicationProfile:
         self.init_msg_sizes   = []
         self.finish_msg_sizes = []
 
+    def reset(self):
+        self.init_t    = 0.0 
+        self.finish_t  = 0.0 
+        self.dev_cpy_t = 0.0
+
+        self.init_m    = 0.0
+        self.finish_m  = 0.0 
+        self.dev_cpy_m = 0.0
+
+        self.init_msg_sizes   = []
+        self.finish_msg_sizes = []
+
     def init_start(self, msg_size=None):
         from mpi4py import MPI
         self.init_t -= MPI.Wtime()
@@ -205,6 +217,7 @@ class CommunicationProfile:
         """
         Finalizes profiling data
         """
+        self.print_profile()
         return
 
     def print_profile(self):

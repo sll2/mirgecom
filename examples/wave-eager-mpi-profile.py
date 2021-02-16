@@ -45,6 +45,8 @@ from mirgecom.wave import wave_operator
 import pyopencl.tools as cl_tools
 import pyopencl as pycl
 
+from mirgecom.profiling import PyOpenCLProfilingArrayContext
+
 
 def bump(actx, discr, t=0):
     """Create a bump."""
@@ -68,10 +70,18 @@ def bump(actx, discr, t=0):
 @mpi_entry_point
 def main():
     """Drive the example."""
+    PROFILING = True
+
     cl_ctx = cl.create_some_context()
-    queue = cl.CommandQueue(cl_ctx)
-    actx = PyOpenCLArrayContext(queue,
-        allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+    if PROFILING:
+        queue = cl.CommandQueue(cl_ctx,
+            properties=cl.command_queue_properties.PROFILING_ENABLE)
+        actx = PyOpenCLProfilingArrayContext(queue,
+            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
+    else:
+        queue = cl.CommandQueue(cl_ctx)
+        actx = PyOpenCLArrayContext(queue,
+            allocator=cl_tools.MemoryPool(cl_tools.ImmediateAllocator(queue)))
 
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -86,7 +96,16 @@ def main():
     mesh_dist = MPIMeshDistributor(comm)
 
     dim = 2
-    nel_1d = 16
+    nel_1d = 5 
+    #nel_1d = 72   # 10,082
+    #nel_1d = 101  # 20,000
+    #nel_1d = 143  # 40,328
+    #nel_1d = 202  # 80,000
+    #nel_1d = 286  # 160,178
+    #nel_1d = 401  # 320,000
+    #nel_1d = 567  # 640,712
+    #nel_1d = 802  # 1,283,202
+    #nel_1d = 1134  # 2,567,378 elements
 
     if mesh_dist.is_mananger_rank():
         from meshmode.mesh.generation import generate_regular_rect_mesh
@@ -111,14 +130,15 @@ def main():
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
                     mpi_communicator=Comm)
 
-    if dim == 2:
-        # no deep meaning here, just a fudge factor
-        dt = 0.75/(nel_1d*order**2)
-    elif dim == 3:
-        # no deep meaning here, just a fudge factor
-        dt = 0.45/(nel_1d*order**2)
-    else:
-        raise ValueError("don't have a stable time step guesstimate")
+    dt = 0.01
+    #if dim == 2:
+    #    # no deep meaning here, just a fudge factor
+    #    dt = 0.75/(nel_1d*order**2)
+    #elif dim == 3:
+    #    # no deep meaning here, just a fudge factor
+    #    dt = 0.45/(nel_1d*order**2)
+    #else:
+    #    raise ValueError("don't have a stable time step guesstimate")
 
     fields = flat_obj_array(bump(actx, discr),
         [discr.zeros(actx) for i in range(discr.dim)])
@@ -127,12 +147,27 @@ def main():
         return wave_operator(discr, c=1, w=w)
 
     t = 0
-    t_final = 3
+    t_final = 0.21 
     istep = 0
     while t < t_final:
+        if istep == 10:
+            from pyinstrument import Profiler
+            if PROFILING:
+                ignore = actx.tabulate_profiling_data() # noqa
+            profiler = Profiler()
+            profiler.start()
+            Comm.comm_profile.reset()
+
         fields = rk4_step(fields, t, dt, rhs)
         #if istep % 10 == 0:
         #    print(istep, t, discr.norm(fields[0]))
+
+        if istep == 19:
+            if PROFILING:
+                print(actx.tabulate_profiling_data())
+            profiler.stop()
+            print(profiler.output_text(unicode=True, color=True, show_all=True))
+            Comm.comm_profile.finalize()
 
         t += dt
         istep += 1

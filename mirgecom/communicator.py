@@ -147,9 +147,9 @@ class CommunicationProfile:
 
         # Variables to hold numbers of messages initialized and received
         # as well as the number of data copies to and from device
-        self.init_m    = 0.0
-        self.finish_m  = 0.0 
-        self.dev_cpy_m = 0.0
+        self.init_m    = 0
+        self.finish_m  = 0 
+        self.dev_cpy_m = 0
 
         # Lists to contain ALL messages sizes for initialized and
         # received messages per rank
@@ -161,9 +161,9 @@ class CommunicationProfile:
         self.finish_t  = 0.0 
         self.dev_cpy_t = 0.0
 
-        self.init_m    = 0.0
-        self.finish_m  = 0.0 
-        self.dev_cpy_m = 0.0
+        self.init_m    = 0
+        self.finish_m  = 0 
+        self.dev_cpy_m = 0
 
         self.init_msg_sizes   = []
         self.finish_msg_sizes = []

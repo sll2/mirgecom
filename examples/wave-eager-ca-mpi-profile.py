@@ -38,8 +38,6 @@ from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
-from mirgecom.mpi import MPI_Info 
-from mirgecom.mpi import CommunicationProfile 
 
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
@@ -80,8 +78,8 @@ def main():
     num_parts = comm.Get_size()
 
     cuda = True 
-    mpi_comm_info = MPI_Info(comm, cuda)
-    CommProf = CommunicationProfile()
+    from mirgecom.communicator import Communicator
+    Comm = Communicator(comm, cuda)
 
     print("%d num procs" % num_parts)
 
@@ -112,7 +110,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_info=mpi_comm_info, comm_profile=CommProf)
+                    mpi_communicator=Comm)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor
@@ -151,6 +149,11 @@ def main():
     #        print(msgs)
     #        print(avgs)
     #    comm.Barrier()
+    rank = comm.Get_rank()
+    for i in range(num_parts):
+        if i == rank:
+            Comm.comm_profile.print_profile()
+        comm.Barrier()
         
 
 

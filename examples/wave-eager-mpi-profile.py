@@ -109,7 +109,7 @@ def main():
     order = 3
 
     discr = EagerDGDiscretization(actx, local_mesh, order=order,
-                    mpi_info=mpi_comm_info, comm_profile=CommProf)
+                    mpi_communicator=Comm)
 
     if dim == 2:
         # no deep meaning here, just a fudge factor

@@ -5,7 +5,7 @@ from mpi4py import MPI
 # CPU helper functions for sending and receiving
 #
 ################################################
-def _isend_cpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
+def _isend_cpu(mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
     """
     Returns :
         MPI send request
@@ -24,19 +24,19 @@ def _isend_cpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
 
     if profiler:
         profiler.init_start()
-    Return_Request = self.mpi_communicator.Isend(local_data, receiver_rank, tag=Tag)
+    Return_Request = mpi_communicator.Isend(local_data, receiver_rank, tag=Tag)
     if profiler:
         profiler.init_stop()
     
     return Return_Request 
     
-def _irecv_cpu(actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
+def _irecv_cpu(mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
     """
     Returns mpi recv request
     """
     if profiler:
         profiler.init_start()
-    Return_Request = self.mpi_communicator.Irecv(data_ary, sender_rank, tag=Tag)
+    Return_Request = mpi_communicator.Irecv(data_ary, sender_rank, tag=Tag)
     if profiler:
         profiler.init_stop()
 
@@ -69,7 +69,7 @@ def _wait_cpu(mpi_req, actx, data_ary, profiler):
 # GPU helper functions for sending and receiving
 #
 ################################################
-def _isend_gpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
+def _isend_gpu(mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
     """
     Returns mpi send request
     """
@@ -80,14 +80,14 @@ def _isend_gpu(actx, data_ary, data_ary_size, receiver_rank, Tag, profiler):
     bytes_size = data_ary_size * 8
     buf = utils.as_buffer(cl_mem, bytes_size, 0)
     
-    Return_Request = self.mpi_communicator.Isend([buf, self.d_type], receiver_rank, tag=Tag)
+    Return_Request = mpi_communicator.Isend([buf, self.d_type], receiver_rank, tag=Tag)
     
     if profiler:
         profiler.init_stop()
 
     return Return_Request 
 
-def _irecv_gpu(actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
+def _irecv_gpu(mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
     """
     Returns mpi recv request
     """
@@ -98,7 +98,7 @@ def _irecv_gpu(actx, data_ary, data_ary_size, sender_rank, Tag, profiler):
     bytes_size = data_ary_size * 8
     buf = utils.as_buffer(cl_mem, bytes_size, 0)
     
-    Return_Request = self.mpi_communicator.Irecv([buf, self.d_type], sender_rank, tag=Tag)
+    Return_Request = mpi_communicator.Irecv([buf, self.d_type], sender_rank, tag=Tag)
     
     if profiler:
         profiler.init_stop()
@@ -261,7 +261,7 @@ class Communicator:
         receiver_rank : MPI rank receiving data
                   Tag : MPI communication tag 
         """
-        return self.isend(actx, data_ary, data_ary_size, receiver_rank, Tag, self.comm_profile)
+        return self.isend(self.mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, Tag, self.comm_profile)
 
     def Irecv(self, actx, data_ary, data_ary_size, sender_rank, Tag):
         """
@@ -271,7 +271,7 @@ class Communicator:
           sender_rank : MPI rank sending data
                   Tag : MPI communication tag 
         """
-        return self.irecv(actx, data_ary, data_ary_size, receiver_rank, Tag, self.comm_profile)
+        return self.irecv(self.mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, Tag, self.comm_profile)
 
     def Wait(self, mpi_req, actx=None, data_ary=None):
         # If it's a recv req, return recv_req, if it's a send req, then return send req

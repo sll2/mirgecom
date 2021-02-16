@@ -38,8 +38,6 @@ from grudge.eager import EagerDGDiscretization
 from grudge.shortcuts import make_visualizer
 
 from mirgecom.mpi import mpi_entry_point
-from mirgecom.mpi import Communicator 
-from mirgecom.mpi import CommunicationProfile 
 from mirgecom.integrators import rk4_step
 from mirgecom.wave import wave_operator
 from mirgecom.profiling import PyOpenCLProfilingArrayContext
@@ -84,8 +82,10 @@ def main():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     num_parts = comm.Get_size()
-    CommProf = CommunicationProfile(comm)
+
+    from mirgecom.communicator import Communicator
     Comm = Communicator(comm)
+
     print("%d num procs" % num_parts)
     print("Device ", pycl.Device.hashable_model_and_version_identifier)
 

@@ -225,7 +225,7 @@ class CommunicationProfile:
         Formatted print of profiling data
         """
         from mpi4py import MPI
-        rank = MPI.Get_rank()
+        rank = MPI.COMM_WORLD.Get_rank()
         print(F'------------------Process {rank:4d}------------')
         print(F'Init Total Time {self.init_t:.5f}')
         print(F'Init Messages {self.init_m:4d}')

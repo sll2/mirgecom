@@ -3,7 +3,7 @@
 
 
 def main():
-    from setuptools import setup, find_packages
+    from setuptools import setup, find_packages, Extension
 
     version_dict = {}
     init_filename = "mirgecom/version.py"
@@ -38,6 +38,8 @@ def main():
               "Topic :: Software Development :: Libraries",
               "Topic :: Utilities",
               ],
+
+          ext_modules=[Extension("utils", sources=["mirgecom/utils.c"])]
 
           packages=find_packages(),
 

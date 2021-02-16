@@ -271,7 +271,7 @@ class Communicator:
           sender_rank : MPI rank sending data
                   Tag : MPI communication tag 
         """
-        return self.irecv(self.mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, Tag, self.comm_profile)
+        return self.irecv(self.mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag, self.comm_profile)
 
     def Wait(self, mpi_req, actx=None, data_ary=None):
         # If it's a recv req, return recv_req, if it's a send req, then return send req

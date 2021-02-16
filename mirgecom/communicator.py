@@ -207,10 +207,19 @@ class CommunicationProfile:
         """
         return
 
-    def print(self):
+    def print_profile(self):
         """
         Formatted print of profiling data
         """
+        from mpi4py import MPI
+        rank = MPI.Get_rank()
+        print(F'------------------Process {rank:4d}------------')
+        print(F'Init Total Time {self.init_t:.5f}')
+        print(F'Init Messages {self.init_m:4d}')
+        print(F'Finish Total Time {self.finish_t:.5f}')
+        print(F'Finish Messages {self.finish_m:4d}')
+        print(F'Device Copy Total Time {self.dev_cpy_t:.5f}')
+        print(F'Device Copies {self.dev_cpy_m:4d}')
 
 ################################################
 #

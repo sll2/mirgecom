@@ -34,7 +34,6 @@ def _irecv_cpu(mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag
     """
     Returns mpi recv request
     """
-    data_ary = np.empty(data_ary_size)
     if profiler:
         profiler.init_start()
     Return_Request = mpi_communicator.Irecv(data_ary, sender_rank, tag=Tag)
@@ -93,10 +92,11 @@ def _irecv_gpu(mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag
     """
     Returns mpi recv request
     """
+    array = actx.from_numpy(data_ary)
     import utils
     if profiler:
         profiler.init_start()
-    bdata = data_ary.base_data
+    bdata = array.base_data
     cl_mem = bdata.int_ptr
     bytes_size = data_ary_size * 8
     buf = utils.as_buffer(cl_mem, bytes_size, 0)

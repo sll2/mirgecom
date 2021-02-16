@@ -34,6 +34,7 @@ def _irecv_cpu(mpi_communicator, actx, data_ary, data_ary_size, sender_rank, Tag
     """
     Returns mpi recv request
     """
+    data_ary = np.empty(data_ary_size)
     if profiler:
         profiler.init_start()
     Return_Request = mpi_communicator.Irecv(data_ary, sender_rank, tag=Tag)

@@ -39,7 +39,7 @@ def main():
               "Topic :: Utilities",
               ],
 
-          ext_modules=[Extension("utils", sources=["mirgecom/utils.c"])]
+          ext_modules=[Extension("utils", sources=["mirgecom/utils.c"])],
 
           packages=find_packages(),
 

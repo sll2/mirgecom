@@ -23,7 +23,7 @@ def _isend_cpu(mpi_communicator, actx, data_ary, data_ary_size, receiver_rank, T
         profiler.dev_copy_stop()
 
     if profiler:
-        profiler.init_start()
+        profiler.init_start(data_ary_size)
     Return_Request = mpi_communicator.Isend(local_data, receiver_rank, tag=Tag)
     if profiler:
         profiler.init_stop()
@@ -220,6 +220,13 @@ class CommunicationProfile:
         Finalizes profiling data
         """
         self.print_profile()
+
+        if len(self.init_msg_sizes > 0):
+            import numpy as np
+            from mpi4py import MPI
+            p = MPI.COMM_WORLD.Get_rank()
+            np.save('initialized_msg_sizes_p'+str(p)+, np.array(self.init_msg_sizes))
+
         return
 
     def print_profile(self):
@@ -235,6 +242,9 @@ class CommunicationProfile:
         print(F'Finish Messages {self.finish_m:4d}')
         print(F'Device Copy Total Time {self.dev_cpy_t:.5f}')
         print(F'Device Copies {self.dev_cpy_m:4d}')
+
+    def print_msg_sizes(self):
+        
 
 ################################################
 #
